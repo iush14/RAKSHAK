@@ -33,9 +33,9 @@ services:
       - key: RUN_MIGRATIONS
         value: "true"
       - key: FRONTEND_URL
-        value: "https://rakshak-frontend.onrender.com"
+        value: "https://rakshak-frontend-yoem.onrender.com"
       - key: CORS_ALLOWED_ORIGINS
-        value: "https://rakshak-frontend.onrender.com,http://localhost:5173"
+        value: "https://rakshak-frontend-yoem.onrender.com,http://localhost:5173"
       - key: FIREBASE_PROJECT_ID
         value: rakshak-auth
       - key: GITHUB_CLIENT_ID
