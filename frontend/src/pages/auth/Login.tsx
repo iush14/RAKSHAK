@@ -66,6 +66,8 @@ export default function Login({ initialTab = 'login' }: AuthPageProps) {
         setErrorMessage('Popup was blocked by your browser. Please allow popups for this site to sign in.');
       } else if (err.code === 'auth/cancelled-popup-request') {
         // Ignored duplicate
+      } else if (err.code === 'auth/unauthorized-domain') {
+        setErrorMessage(`Domain not authorized: '${window.location.hostname}' must be added to Firebase Console -> Authentication -> Settings -> Authorized domains.`);
       } else {
         setErrorMessage(err.message || 'Failed to authenticate with Google. Please try again.');
       }
@@ -99,6 +101,8 @@ export default function Login({ initialTab = 'login' }: AuthPageProps) {
         setErrorMessage('Popup was blocked by your browser. Please allow popups for this site to sign in.');
       } else if (err.code === 'auth/account-exists-with-different-credential') {
         setErrorMessage('An account already exists with the same email using a different provider.');
+      } else if (err.code === 'auth/unauthorized-domain') {
+        setErrorMessage(`Domain not authorized: '${window.location.hostname}' must be added to Firebase Console -> Authentication -> Settings -> Authorized domains.`);
       } else {
         setErrorMessage(err.message || 'GitHub OAuth authorization failed. Ensure GitHub provider is configured in Firebase Console.');
       }
