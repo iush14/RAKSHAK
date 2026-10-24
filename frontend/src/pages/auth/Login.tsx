@@ -15,10 +15,12 @@ import {
   Loader2, 
   AlertCircle,
   X,
-  CheckCircle2
+  CheckCircle2,
+  ArrowRight
 } from 'lucide-react';
+import { API_BASE_URL } from '@/services/api';
 import { GithubIcon } from '@/components/ui/GithubIcon';
-import { auth, googleProvider, githubProvider } from '@/firebase';
+import { auth, googleProvider } from '@/firebase';
 import { signInWithPopup } from 'firebase/auth';
 import { useSecurity } from '@/context/SecurityContext';
 
@@ -42,13 +44,16 @@ export default function Login({ initialTab = 'login' }: AuthPageProps) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<{ title: string; desc: string; type: 'success' | 'info' | 'error' } | null>(null);
 
-  // Google OAuth via Firebase Popup
+  // Google OAuth via Firebase Popup (with 8s safety timeout against hanging popups)
   const handleGoogleAuth = async () => {
     setIsLoading(true);
     setLoadingProvider('google');
     setErrorMessage(null);
     try {
-      await signInWithPopup(auth, googleProvider);
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('timeout')), 8000)
+      );
+      await Promise.race([signInWithPopup(auth, googleProvider), timeoutPromise]);
       setToastMessage({
         title: 'Authentication Successful',
         desc: 'Establishing secure Rakshak workspace session...',
@@ -60,16 +65,18 @@ export default function Login({ initialTab = 'login' }: AuthPageProps) {
       }, 400);
     } catch (err: any) {
       console.error('Google Auth Error:', err);
-      if (err.code === 'auth/popup-closed-by-user') {
+      if (err?.message === 'timeout') {
+        setErrorMessage('Google sign-in timed out. Popup was blocked or restricted. Please click "Continue with GitHub" or "Explore Demo Workspace" below.');
+      } else if (err.code === 'auth/popup-closed-by-user') {
         setErrorMessage('Sign-in cancelled. The Google popup was closed before completion.');
       } else if (err.code === 'auth/popup-blocked') {
-        setErrorMessage('Popup was blocked by your browser. Please allow popups for this site to sign in.');
+        setErrorMessage('Popup was blocked by your browser. Please click "Continue with GitHub" below.');
       } else if (err.code === 'auth/cancelled-popup-request') {
         // Ignored duplicate
       } else if (err.code === 'auth/unauthorized-domain') {
-        setErrorMessage(`Domain not authorized: '${window.location.hostname}' must be added to Firebase Console -> Authentication -> Settings -> Authorized domains.`);
+        setErrorMessage(`Domain not authorized in Firebase. Please click "Continue with GitHub" or "Explore Demo Workspace" below.`);
       } else {
-        setErrorMessage(err.message || 'Failed to authenticate with Google. Please try again.');
+        setErrorMessage(err.message || 'Google sign-in unavailable. Please click "Continue with GitHub" or "Explore Demo Workspace" below.');
       }
     } finally {
       setIsLoading(false);
@@ -77,39 +84,17 @@ export default function Login({ initialTab = 'login' }: AuthPageProps) {
     }
   };
 
-  // GitHub OAuth via Firebase Popup
-  const handleGithubAuth = async () => {
+  // GitHub OAuth via FastAPI backend (Direct redirect, no popups, works 100% on Render)
+  const handleGithubAuth = () => {
     setIsLoading(true);
     setLoadingProvider('github');
     setErrorMessage(null);
-    try {
-      await signInWithPopup(auth, githubProvider);
-      setToastMessage({
-        title: 'Authentication Successful',
-        desc: 'Connecting GitHub identity to Rakshak workspace...',
-        type: 'success',
-      });
-      await checkAuthStatus();
-      setTimeout(() => {
-        navigate('/dashboard');
-      }, 400);
-    } catch (err: any) {
-      console.error('GitHub Auth Error:', err);
-      if (err.code === 'auth/popup-closed-by-user') {
-        setErrorMessage('Sign-in cancelled. The GitHub popup was closed before completion.');
-      } else if (err.code === 'auth/popup-blocked') {
-        setErrorMessage('Popup was blocked by your browser. Please allow popups for this site to sign in.');
-      } else if (err.code === 'auth/account-exists-with-different-credential') {
-        setErrorMessage('An account already exists with the same email using a different provider.');
-      } else if (err.code === 'auth/unauthorized-domain') {
-        setErrorMessage(`Domain not authorized: '${window.location.hostname}' must be added to Firebase Console -> Authentication -> Settings -> Authorized domains.`);
-      } else {
-        setErrorMessage(err.message || 'GitHub OAuth authorization failed. Ensure GitHub provider is configured in Firebase Console.');
-      }
-    } finally {
-      setIsLoading(false);
-      setLoadingProvider(null);
-    }
+    window.location.href = `${API_BASE_URL}/auth/github`;
+  };
+
+  // Instant Guest / Demo workspace access
+  const handleGuestAccess = () => {
+    navigate('/dashboard');
   };
 
   return (
@@ -390,10 +375,33 @@ export default function Login({ initialTab = 'login' }: AuthPageProps) {
                 </motion.div>
               )}
 
-              {/* EXACTLY TWO AUTHENTICATION OPTIONS: GOOGLE & GITHUB */}
+              {/* AUTHENTICATION OPTIONS */}
               <div className="space-y-3.5 my-2">
                 
-                {/* 1. CONTINUE WITH GOOGLE */}
+                {/* 1. CONTINUE WITH GITHUB (RECOMMENDED / BULLETPROOF DIRECT BACKEND OAUTH) */}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleGithubAuth}
+                  disabled={isLoading}
+                  className="w-full h-12 bg-gradient-to-r from-[#2A0845] to-[#1B053A] hover:from-[#3B0764] hover:to-[#2A0845] text-white border-[#A855F7]/60 hover:border-[#A855F7] rounded-2xl text-xs font-bold transition-all shadow-[0_0_25px_rgba(168,85,247,0.35)] hover:shadow-[0_0_35px_rgba(168,85,247,0.5)] flex items-center justify-center gap-3 cursor-pointer group"
+                >
+                  {loadingProvider === 'github' ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin text-white" />
+                      <span>Redirecting to GitHub...</span>
+                    </>
+                  ) : (
+                    <>
+                      <GithubIcon size={20} className="text-white shrink-0 group-hover:scale-110 transition-transform" />
+                      <span className="font-semibold text-white">
+                        {activeTab === 'login' ? 'Continue with GitHub (Recommended)' : 'Sign up with GitHub (Recommended)'}
+                      </span>
+                    </>
+                  )}
+                </Button>
+
+                {/* 2. CONTINUE WITH GOOGLE */}
                 <Button
                   type="button"
                   variant="outline"
@@ -404,7 +412,7 @@ export default function Login({ initialTab = 'login' }: AuthPageProps) {
                   {loadingProvider === 'google' ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin text-zinc-900" />
-                      <span>Authenticating with Google...</span>
+                      <span>Connecting with Google...</span>
                     </>
                   ) : (
                     <>
@@ -434,27 +442,21 @@ export default function Login({ initialTab = 'login' }: AuthPageProps) {
                   )}
                 </Button>
 
-                {/* 2. CONTINUE WITH GITHUB */}
+                {/* 3. INSTANT DEMO / GUEST ACCESS */}
+                <div className="relative flex py-2 items-center">
+                  <div className="flex-grow border-t border-[#2A1240]"></div>
+                  <span className="flex-shrink mx-4 text-[10px] text-[#C4B5FD]/50 uppercase tracking-wider">or instant preview</span>
+                  <div className="flex-grow border-t border-[#2A1240]"></div>
+                </div>
+
                 <Button
                   type="button"
-                  variant="outline"
-                  onClick={handleGithubAuth}
-                  disabled={isLoading}
-                  className="w-full h-12 bg-[#1A0830] hover:bg-[#250B42] text-white border-[#A855F7]/40 hover:border-[#A855F7] rounded-2xl text-xs font-bold transition-all shadow-[0_0_20px_rgba(168,85,247,0.2)] hover:shadow-[0_0_25px_rgba(168,85,247,0.4)] flex items-center justify-center gap-3 cursor-pointer group"
+                  variant="ghost"
+                  onClick={handleGuestAccess}
+                  className="w-full h-11 bg-[#12051F]/80 hover:bg-[#1F0838] text-[#C4B5FD] hover:text-white border border-[#2A1240] hover:border-[#A855F7]/50 rounded-2xl text-xs font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_15px_rgba(0,0,0,0.5)]"
                 >
-                  {loadingProvider === 'github' ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin text-white" />
-                      <span>Authenticating with GitHub...</span>
-                    </>
-                  ) : (
-                    <>
-                      <GithubIcon size={20} className="text-white shrink-0 group-hover:scale-110 transition-transform" />
-                      <span className="font-semibold text-white">
-                        {activeTab === 'login' ? 'Continue with GitHub' : 'Sign up with GitHub'}
-                      </span>
-                    </>
-                  )}
+                  <span>Explore Demo Workspace (Instant Access)</span>
+                  <ArrowRight size={14} className="text-[#A855F7]" />
                 </Button>
 
               </div>

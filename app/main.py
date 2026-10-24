@@ -92,6 +92,8 @@ def get_frontend_url() -> str:
     url = os.getenv("FRONTEND_URL", "http://localhost:5173").strip()
     if url and not url.startswith("http://") and not url.startswith("https://"):
         url = f"https://{url}"
+    if "rakshak-frontend.onrender.com" in url:
+        url = "https://rakshak-frontend-yoem.onrender.com"
     return url.rstrip("/")
 
 

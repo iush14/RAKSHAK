@@ -2,7 +2,10 @@ import { auth } from '@/firebase';
 import { type Finding } from '@/data/findings';
 
 // Normalize FastAPI Backend URL configuration
-const envRawUrl = import.meta.env.VITE_API_BASE_URL || (typeof window !== 'undefined' && window.location.hostname.includes('onrender.com') ? 'https://rakshak-backend-22wr.onrender.com' : 'http://127.0.0.1:8000');
+let envRawUrl = import.meta.env.VITE_API_BASE_URL || (typeof window !== 'undefined' && window.location.hostname.includes('onrender.com') ? 'https://rakshak-backend-22wr.onrender.com' : 'http://127.0.0.1:8000');
+if (typeof envRawUrl === 'string' && envRawUrl.includes('rakshak-backend.onrender.com') && !envRawUrl.includes('22wr')) {
+  envRawUrl = 'https://rakshak-backend-22wr.onrender.com';
+}
 export const RAW_URL = (envRawUrl.startsWith('http://') || envRawUrl.startsWith('https://'))
   ? envRawUrl
   : `https://${envRawUrl}`;
